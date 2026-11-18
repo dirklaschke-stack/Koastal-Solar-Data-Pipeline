@@ -1,50 +1,52 @@
-# Kostal Projekt: Integration & Dokumentation
+# Kostal Project: Integration & Documentation
 
-Diese Dokumentation beschreibt Schritt für Schritt die Vorgehensweise, Architektur und Umsetzung im Rahmen des Kostal-Projekts.
+This documentation describes the step-by-step approach, architecture, and implementation of the Kostal project.cyxcyc
 
-## 📋 Übersicht & Zielsetzung
-Ziel des Projekts war die Anbindung, Datenerfassung und strukturierte Auswertung von Kostal-Wechselrichter- bzw. Energiemanagement-Daten, um Energieflüsse und Leistungsdaten transparent zu überwachen.
+## 📋 Overview & Objectives
+The goal of this project was to connect, collect data from, and structurally analyze Kostal inverter and energy management data in order to monitor energy flows and performance metrics transparently dfgdfg
 
 ---
 
-## 🚀 Schritt-für-Schritt-Dokumentation
+## 🚀 Step-by-Step Documentation
 
-### 1. Anforderungsanalyse & Schnittstellen-Klärung
-* **Identifikation der Datenquellen:** Ermittlung der verfügbaren Endpunkte, Protokolle und Datenstrukturen (z. B. Modbus TCP, REST-API oder lokaler Webserver des Kostal-Geräts).
-* **Definieren der Zielmetriken:** Festlegung, welche Werte (aktuelle PV-Leistung, Hausverbrauch, Einspeisung, Batterieladestand etc.) regelmäßig ausgelesen werden müssen.
+### 1. Requirements Analysis & Interface Clarification
+* **Data Source Identification:** Determining available endpoints, protocols, and data structures (e.g., Modbus TCP, REST API, or the Kostal device's local web server).
+* **Target Metrics Definition:** Establishing which values (current PV generation, household consumption, feed-in, battery state of charge, etc.) need to be polled regularly.
 
-### 2. API-Erkundung & Testing mit Postman
-* **Request-Setup:** Erstellung einer Postman-Collection zur gezielten Ansprache der REST-Endpunkte des Kostal-Wechselrichters.
-* **Validierung & Auth:** Testen von Authentifizierungsmechanismen (falls erforderlich) und Überprüfen der JSON-Payloads sowie Antwortzeiten.
-* **Mocking & Dokumentation:** Dokumentation der Antwortstrukturen für die spätere Implementierung in die Automatisierungs-Pipeline.
+### 2. API Exploration & Testing with Postman
+* **Request Setup:** Creating a Postman collection for targeted interaction with the Kostal inverter's REST endpoints.
+* **Validation & Auth:** Testing authentication mechanisms (if applicable) and checking JSON payloads and response times.
+* **Mocking & Documentation:** Documenting response structures for subsequent implementation in the automation pipeline.
 
 ![Postman Logo](./assets/postman.png)
 
-### 3. Konzeption der Architektur & Datenpipeline
-* **Automatisierungs-Layer:** Aufsetzen von Workflows (z. B. über n8n) unter Verwendung der in Postman validierten Endpunkte zur automatisierten Abfrage in definierten Intervallen.
-* **Datenbank-Design:** Einrichtung einer strukturierten relationalen Datenbank (PostgreSQL) zur persistenten Speicherung der historischen Messwerte und Zeitreihen.
-* **Schnittstellen-Design:** Definition von Fehlertoleranzen, Retry-Mechanismen bei Verbindungsausfällen und Logging.
+### 3. Architecture Design & Data Pipeline
+* **Automation Layer:** Setting up workflows (e.g., using n8n) utilizing the endpoints validated in Postman for automated polling at defined intervals.
+* **Database Design:** Setting up a structured relational database (PostgreSQL) for persistent storage of historical measurements and time series.
+* **Interface Design:** Defining fault tolerances, retry mechanisms for connection drops, and logging.
 
 ![n8n Workflow](./assets/n8n.png)
 
-### 4. Implementierung & Automatisierung
-* **API-/Protokoll-Anbindung:** Aufbau der HTTP-/Modbus-Abfragen in der Automatisierungsumgebung und Validierung der Rohdatenantworten.
-* **Datenbereinigung & Transformation:** Mappen der Rohdaten auf ein sauberes Schema (Zeitstempel, Messwert, Einheit, Status).
-* **Automatisierte Speicherung:** Schreiben der transformierten Datensätze in die PostgreSQL-Datenbank.
+### 4. Implementation & Automation
+* **API/Protocol Integration:** Building HTTP/Modbus queries within the automation environment and validating raw responses.
+* **Data Cleaning & Transformation:** Mapping raw data to a clean schema (timestamp, metric, unit, status).
+* **Automated Storage:** Writing the transformed datasets into the PostgreSQL database.
 
 ![PostgreSQL Logo](./assets/Postgres.png)
 
-### 5. Visualisierung & Monitoring
-* **Anbindung von BI-Tools:** Verknüpfung der Datenbank mit Power BI zur Erstellung von Dashboards.
-* **Dashboard-Design:** Visualisierung von Kennzahlen wie Autarkiegrad, täglichem Solarertrag, Netzbezug und Eigenverbrauch im Zeitverlauf.
+### 5. Visualization & Monitoring
+* **BI Tool Integration:** Connecting the database to Power BI to create dashboards.
+* **Dashboard Design:** Visualizing key performance indicators such as self-sufficiency rate, daily solar yield, grid import, and self-consumption over time.
 
 ![PowerBI Logo](./assets/PowerBI.png)
 
 ---
 
-## 🛠️ Verwendeter Tech-Stack
-* **API-Testing & Dokumentation:** Postman
-* **Automatisierung:** n8n (Docker-basiert)
-* **Datenbank:** PostgreSQL
-* **Visualisierung:** Power BI
-* **Protokolle / Schnittstellen:** REST-API / Modbus TCP
+## 🛠️ Tech Stack
+* **API Testing & Documentation:** Postman
+* **Automation:** n8n (Docker-based)
+* **Database:** PostgreSQL
+* **Visualization:** Power BI
+* **Protocols / Interfaces:** REST API / Modbus TCP
+
+
