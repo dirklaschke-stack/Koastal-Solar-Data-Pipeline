@@ -18,19 +18,27 @@ Ziel des Projekts war die Anbindung, Datenerfassung und strukturierte Auswertung
 * **Validierung & Auth:** Testen von Authentifizierungsmechanismen (falls erforderlich) und Überprüfen der JSON-Payloads sowie Antwortzeiten.
 * **Mocking & Dokumentation:** Dokumentation der Antwortstrukturen für die spätere Implementierung in die Automatisierungs-Pipeline.
 
+![Postman Logo](./assets/postman.png)
+
 ### 3. Konzeption der Architektur & Datenpipeline
 * **Automatisierungs-Layer:** Aufsetzen von Workflows (z. B. über n8n) unter Verwendung der in Postman validierten Endpunkte zur automatisierten Abfrage in definierten Intervallen.
 * **Datenbank-Design:** Einrichtung einer strukturierten relationalen Datenbank (PostgreSQL) zur persistenten Speicherung der historischen Messwerte und Zeitreihen.
 * **Schnittstellen-Design:** Definition von Fehlertoleranzen, Retry-Mechanismen bei Verbindungsausfällen und Logging.
+
+![n8n Workflow](./assets/n8n.png)
 
 ### 4. Implementierung & Automatisierung
 * **API-/Protokoll-Anbindung:** Aufbau der HTTP-/Modbus-Abfragen in der Automatisierungsumgebung und Validierung der Rohdatenantworten.
 * **Datenbereinigung & Transformation:** Mappen der Rohdaten auf ein sauberes Schema (Zeitstempel, Messwert, Einheit, Status).
 * **Automatisierte Speicherung:** Schreiben der transformierten Datensätze in die PostgreSQL-Datenbank.
 
+![PostgreSQL Logo](./assets/Postgres.png)
+
 ### 5. Visualisierung & Monitoring
 * **Anbindung von BI-Tools:** Verknüpfung der Datenbank mit Power BI zur Erstellung von Dashboards.
 * **Dashboard-Design:** Visualisierung von Kennzahlen wie Autarkiegrad, täglichem Solarertrag, Netzbezug und Eigenverbrauch im Zeitverlauf.
+
+![PowerBI Logo](./assets/PowerBI.png)
 
 ---
 
