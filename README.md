@@ -40,11 +40,19 @@ Koastal-Solar-Data-Pipeline/
 
 ![API-Erkundung & Tests mit Postman](assets/postman.png)
 
+API-Erkundung & Tests mit Postman
+
 ![Konzeption der Polling-Intervalle in n8n](assets/n8n.png)
+
+Konzeption der Polling-Intervalle in n8n
 
 ![Aufbau eines relationalen Schemas in PostgreSQL](assets/Postgres.png)
 
+Aufbau eines relationalen Schemas in PostgreSQL
+
 ![Auswertung von Kennzahlen in Power BI](assets/PowerBI.png)
+
+Auswertung von Kennzahlen in Power BI
 
 ## 4. Verwendete Tools & Technik
 
