@@ -38,21 +38,21 @@ Koastal-Solar-Data-Pipeline/
 4. **Implementierung & Automatisierung:** Umsetzung der HTTP-Abfragen in **n8n (Docker)**, Bereinigung und Transformation der Rohdaten in ein einheitliches Zielschema (`timestamp`, `metric`, `unit`, `status`) und automatisiertes Schreiben in PostgreSQL.
 5. **Visualisierung & Monitoring:** Anbindung der PostgreSQL-Datenbank an **Power BI** zur Auswertung zentraler Kennzahlen wie Autarkiegrad, täglicher Solarertrag, Netzbezug und Eigenverbrauchsquote im Zeitverlauf.
 
-![API-Erkundung & Tests mit Postman](assets/postman.png)
-
 API-Erkundung & Tests mit Postman
 
-![Konzeption der Polling-Intervalle in n8n](assets/n8n.png)
+![API-Erkundung & Tests mit Postman](assets/postman.png)
 
 Konzeption der Polling-Intervalle in n8n
 
-![Aufbau eines relationalen Schemas in PostgreSQL](assets/Postgres.png)
+![Konzeption der Polling-Intervalle in n8n](assets/n8n.png)
 
 Aufbau eines relationalen Schemas in PostgreSQL
 
-![Auswertung von Kennzahlen in Power BI](assets/PowerBI.png)
+![Aufbau eines relationalen Schemas in PostgreSQL](assets/Postgres.png)
 
 Auswertung von Kennzahlen in Power BI
+
+![Auswertung von Kennzahlen in Power BI](assets/PowerBI.png)
 
 ## 4. Verwendete Tools & Technik
 
