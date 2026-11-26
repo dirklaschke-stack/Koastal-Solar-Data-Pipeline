@@ -1,0 +1,555 @@
+{
+  "name": "Get Solar Data",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 23,
+              "triggerAtMinute": 55
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a129b499-a1b4-4a8f-b3b3-14d8e16673f1",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\n// Generiert 12 sichere Zufallsbytes und wandelt sie direkt in Base64 um\nconst clientNonce = crypto.randomBytes(12).toString('base64');\n\n// Übergibt den client_nonce an das nächste n8n-Element\nreturn [{\n  json: {\n    ...$input.first().json,\n    client_nonce: clientNonce\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "6425f653-af72-4acc-83e7-6cf7a1db52ab",
+      "name": "CreateNonce"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://<INVERTER_IP>/api/v1/auth/start",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"username\": \"user\",\n  \"nonce\": \"{{ $json.client_nonce }}\"\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "347c0caf-0b0e-4c76-aa8f-0658a841c464",
+      "name": "AuthStart"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst username = \"user\";          // Wieder zurück auf \"user\" gestellt\nconst password = \"<DEIN_INVERTER_PASSWORT>\";       // Dein echtes Inverter-Passwort\n\n// Eingabedaten aus den vorherigen Knoten abgreifen\nconst inverterData = $input.first().json;\nconst serverNonce = inverterData.nonce;\nconst saltBase64 = inverterData.salt;\nconst rounds = parseInt(inverterData.rounds, 10);\nconst transactionId = inverterData.transactionId;\nconst clientNonce = $('CreateNonce').first().json.client_nonce;\n\n// 1. SaltedPassword per PBKDF2 (SHA-256) ableiten\nconst salt = Buffer.from(saltBase64, 'base64');\nconst saltedPassword = crypto.pbkdf2Sync(password, salt, rounds, 32, 'sha256');\n\n// 2. ClientKey & StoredKey ableiten\nconst clientKey = crypto.createHmac('sha256', saltedPassword).update('Client Key').digest();\nconst storedKey = crypto.createHash('sha256').update(clientKey).digest();\n\n// 3. AuthMessage nach RFC-5802 zusammensetzen\nconst authMessage = `n=${username},r=${clientNonce},r=${serverNonce},s=${saltBase64},i=${rounds},c=biws,r=${serverNonce}`;\n\n// 4. ClientSignature & ClientProof berechnen\nconst clientSignature = crypto.createHmac('sha256', storedKey).update(authMessage).digest();\n\nconst clientProofBuf = Buffer.alloc(32);\nfor (let i = 0; i < 32; i++) {\n  clientProofBuf[i] = clientKey[i] ^ clientSignature[i];\n}\nconst clientProof = clientProofBuf.toString('base64');\n\n// 5. Übergabe an den nächsten HTTP-Request-Knoten (/auth/finish)\nreturn [{\n  json: {\n    transactionId: transactionId,\n    proof: clientProof\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "84964d58-046a-40aa-be9b-2a7ce10ea657",
+      "name": "CalculateClientProof"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://<INVERTER_IP>/api/v1/auth/finish",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"transactionId\": \"{{ $json.transactionId }}\",\n  \"proof\": \"{{ $json.proof }}\"\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "1dad8b25-ef65-433c-ac2b-4a8ab1012bfa",
+      "name": "AuthFinish"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\n// 1. Antwort von /auth/finish abgreifen (enthält token & signature)\nconst res = $input.first().json;\nif (!res.token) {\n  throw new Error(\"Kein Token in der /auth/finish Antwort gefunden!\");\n}\n\n// 2. Daten aus vorherigen Knoten abrufen\nconst authStart = $('AuthStart').first().json;\nconst transactionId = authStart.transactionId;\nconst serverNonce = authStart.nonce;\nconst saltBase64 = authStart.salt;\nconst rounds = parseInt(authStart.rounds, 10);\nconst clientNonce = $('CreateNonce').first().json.client_nonce;\n\nconst username = \"user\";\nconst password = \"<DEIN_INVERTER_PASSWORT>\";\n\n// 3. PBKDF2 & Keys ableiten (exakt wie in Postman)\nconst salt = Buffer.from(saltBase64, 'base64');\nconst saltedPassword = crypto.pbkdf2Sync(password, salt, rounds, 32, 'sha256');\n\nconst clientKey = crypto.createHmac('sha256', saltedPassword).update('Client Key').digest();\nconst storedKey = crypto.createHash('sha256').update(clientKey).digest();\n\n// 4. AuthMessage zusammensetzen\nconst authMessage = `n=${username},r=${clientNonce},r=${serverNonce},s=${saltBase64},i=${rounds},c=biws,r=${serverNonce}`;\n\n// 5. Exakter KOSTAL Protocol Session Key:\n// HMAC-SHA256(key = storedKey, msg = \"Session Key\" + authMessage + clientKey)\nconst prefix = Buffer.from(\"Session Key\" + authMessage, 'utf8');\nconst sessionKeyMsg = Buffer.concat([prefix, clientKey]);\nconst rawKey = crypto.createHmac('sha256', storedKey).update(sessionKeyMsg).digest();\n\n// 6. 16-Byte IV generieren & Token per AES-256-GCM verschlüsseln\nconst iv = crypto.randomBytes(16);\nconst tokenBytes = Buffer.from(res.token, 'utf8');\n\nconst cipher = crypto.createCipheriv('aes-256-gcm', rawKey, iv);\nlet encrypted = cipher.update(tokenBytes);\nencrypted = Buffer.concat([encrypted, cipher.final()]);\nconst tag = cipher.getAuthTag();\n\n// 7. Übergabe an den /auth/create_session HTTP-Request\nreturn [{\n  json: {\n    token: res.token,\n    signature: res.signature,\n    iv: iv.toString('base64'),\n    payload: encrypted.toString('base64'),\n    transactionId: transactionId,\n    tag: tag.toString('base64')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "c8039683-0be5-4ee4-b751-252fd7fb4655",
+      "name": "CreateSessionPayload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://<INVERTER_IP>/api/v1/auth/create_session",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"iv\": \"{{ $json.iv }}\",\n  \"payload\": \"{{ $json.payload }}\",\n  \"transactionId\": \"{{ $json.transactionId }}\",\n  \"tag\": \"{{ $json.tag }}\"\n}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "0de98a8b-a340-4f96-a5e1-af2f55782f15",
+      "name": "AuthCreateSession"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://<INVERTER_IP>/api/v1/processdata",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Session {{ $('AuthCreateSession').first().json.sessionId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "[\n  {\n    \"moduleid\": \"scb:statistic:EnergyFlow\",\n    \"processdataids\": [\n      \"Statistic:Yield:Day\",\n      \"Statistic:EnergyHome:Day\",\n      \"Statistic:EnergyHomePv:Day\",\n      \"Statistic:EnergyHomeBat:Day\",\n      \"Statistic:EnergyHomeGrid:Day\",\n      \"Statistic:Autarky:Day\",\n      \"Statistic:OwnConsumptionRate:Day\"\n    ]\n  }\n]",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "5562d41c-10c0-40b2-9237-3899acdf32fa",
+      "name": "ProcessData"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cdfbfd09-4447-40b5-9ad8-c0837ae1e30e",
+              "name": "date",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "4399aa0f-6102-412a-a354-1feca7305dec",
+              "name": "yield_kwh",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:Yield:Day')?.value || 0) / 1000).toFixed(2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "5d16410a-07e8-4417-be29-71546a4769cb",
+              "name": "home_consumption_kwh",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:EnergyHome:Day')?.value || 0) / 1000).toFixed(2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "0ac9f65d-b9fc-44f9-99e1-ebcf66993cf9",
+              "name": "home_pv_kwh",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:EnergyHomePv:Day')?.value || 0) / 1000).toFixed(2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "73a16470-25ac-4c0c-968b-07f92d5aa31e",
+              "name": "home_bat_kwh",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:EnergyHomeBat:Day')?.value || 0) / 1000).toFixed(2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "8a15f5d9-3f63-47f1-b9c4-6a9fc5eacd4c",
+              "name": "home_grid_kwh",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:EnergyHomeGrid:Day')?.value || 0) / 1000).toFixed(2)) }}",
+              "type": "number"
+            },
+            {
+              "id": "bb495045-c99d-44f0-8cd6-b01ac0011872",
+              "name": "autarky_pct",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:Autarky:Day')?.value || 0) / 100).toFixed(4)) }}",
+              "type": "number"
+            },
+            {
+              "id": "8b362c4e-2d30-43e1-9c64-b63b2cb03631",
+              "name": "own_consumption_pct",
+              "value": "={{ Number((($json.processdata.find(item => item.id === 'Statistic:OwnConsumptionRate:Day')?.value || 0) / 100).toFixed(4)) }}",
+              "type": "number"
+            },
+            {
+              "id": "ce8bb476-bc5b-494f-b905-1fdaa596cbb0",
+              "name": "updated_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "1493f1e3-c5fa-4b6d-aa95-2ef605056212",
+      "name": "PivotProcessData"
+    },
+    {
+      "parameters": {
+        "content": "## Mapping API - SQL\n**Double click** to edit me. [Guide](https://docs.n8n.io/workflows/components/sticky-notes/)\n\n| Kennzahl | API-Name | PostgreSQL-Spalte | Detail |\n| :--- | :--- | :--- | :--- |\n| **Solarertrag** | `Statistic:Yield:Day` | `yield_kwh` | AC-Ertrag (Wechselrichter) von den Modulen an diesem Tag produzierte Solarenergie (in kWh). |\n| **Gesamtverbrauch** | `Statistic:EnergyHome:Day` | `home_consumption_kwh` | Gesamte am Tag im Haushalt verbrauchte Energiemenge (in kWh). |\n| **PV-Direktverbrauch** | `Statistic:EnergyHomePv:Day` | `home_pv_kwh` | Solarstrom, der im Moment der Erzeugung direkt vom Haus verbraucht wurde (in kWh). |\n| **Batterieentladung** | `Statistic:EnergyHomeBat:Day` | `home_bat_kwh` | Aus dem Batteriespeicher an den Haushalt abgegebene Energie (in kWh). |\n| **Netzbezug** | `Statistic:EnergyHomeGrid:Day` | `home_grid_kwh` | Aus dem öffentlichen Stromnetz bezogene Elektrizität (in kWh). |\n| **Autarkiegrad** | `Statistic:Autarky:Day` | `autarky_pct` | Prozentsatz des Hausverbrauchs, der durch selbst erzeugte Energie gedeckt wurde (in %). |\n| **Eigenverbrauchsquote** | `Statistic:OwnConsumptionRate:Day` | `own_consumption_pct` | Prozentsatz des Gesamtertrags, der lokal (direkt oder über den Speicher) genutzt wurde (in %). |\n",
+        "height": 816,
+        "width": 1200,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1536,
+        -640
+      ],
+      "typeVersion": 1,
+      "id": "22cd7d44-b61f-45a6-880b-7f3ee54a58f1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Authentification\n**Double click** to edit me. [Guide](https://docs.n8n.io/workflows/components/sticky-notes/)\n\n* **Grundprinzip:** Kein Klartext-Passwort im Netz; kryptografischer Handshake zwischen n8n (Client) und Inverter (Server) nach dem Challenge-Response- / SCRAM-Prinzip.\n\n---\n\n### 1. Auth Start (`/api/v1/auth/start`)\n* **Client sendet:** \n    * `username`\n    * `nonce (frisch generierter Client-Zufallswert)`\n* **Inverter antwortet mit Krypto-Grundlagen:**\n    * `Erweiterter Nonce (Client-Nonce + Server-Zusatz)`\n    * `transactionId  (Transaktions-ID)`\n    * `rounds (Iterationen für die Passwortableitung)`\n    * `salt (Kryptografisches Salz)`\n\n### 2. Auth Finish (`/api/v1/auth/finish`)\n* **Client berechnet:** Clientseitiger `verifier-Hash` aus `Passwort + Salt + Rounds + erweitertem Nonce` (das Klartext-Passwort verbleibt sicher auf Client-Seite)\n* **Client sendet:** \n    * `transactionId`\n    * `verifier`\n* **Inverter prüft:** Validiert den Hash und schaltet die Sitzung frei.\n\n### 3. Create Session (`/api/v1/auth/create_session`)\n* **Inverter liefert:** \n    * `sessionId` (als JSON-Wert) und/oder `Session-Cookie` im Response-Header\n* **n8n-Verwendung:** Token wird im Workflow-Kontext vorgehalten und bei allen nachfolgenden API-Abfragen automatisch mitgeschickt.",
+        "height": 816,
+        "width": 1408
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        112,
+        -640
+      ],
+      "typeVersion": 1,
+      "id": "c654d77a-8e2c-431a-8529-624431804dfe",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "energy_daily",
+          "mode": "list",
+          "cachedResultName": "energy_daily"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "date": "={{ $json.date }}",
+            "autarky_pct": "={{ $json.autarky_pct }}",
+            "own_consumption_pct": "={{ $json.own_consumption_pct }}",
+            "updated_at": "={{ $json.updated_at }}"
+          },
+          "matchingColumns": [
+            "date"
+          ],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "yield_kwh",
+              "displayName": "yield_kwh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "home_consumption_kwh",
+              "displayName": "home_consumption_kwh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "home_pv_kwh",
+              "displayName": "home_pv_kwh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "home_bat_kwh",
+              "displayName": "home_bat_kwh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "home_grid_kwh",
+              "displayName": "home_grid_kwh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "autarky_pct",
+              "displayName": "autarky_pct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "own_consumption_pct",
+              "displayName": "own_consumption_pct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        2048,
+        0
+      ],
+      "id": "01598cc1-9649-43d5-a1ea-2b13f1eb6420",
+      "name": "InsertUpdatePosgres",
+      "credentials": {
+        "postgres": {
+          "id": "4rrCVDE2VIKa2j1H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://<INVERTER_IP>/api/v1/processdata",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Session {{ $('AuthCreateSession').first().json.sessionId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "=json",
+        "specifyBody": "json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "{}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        -176
+      ],
+      "id": "153a5054-3b82-4a81-83cb-67eb33c659ca",
+      "name": "ProcessData1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "CreateNonce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateNonce": {
+      "main": [
+        [
+          {
+            "node": "AuthStart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AuthStart": {
+      "main": [
+        [
+          {
+            "node": "CalculateClientProof",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CalculateClientProof": {
+      "main": [
+        [
+          {
+            "node": "AuthFinish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AuthFinish": {
+      "main": [
+        [
+          {
+            "node": "CreateSessionPayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateSessionPayload": {
+      "main": [
+        [
+          {
+            "node": "AuthCreateSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AuthCreateSession": {
+      "main": [
+        [
+          {
+            "node": "ProcessData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ProcessData": {
+      "main": [
+        [
+          {
+            "node": "PivotProcessData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PivotProcessData": {
+      "main": [
+        [
+          {
+            "node": "InsertUpdatePosgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Europe/Berlin",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "228ae1e8-5f74-49d1-ad6f-f7c2864f69d8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ac4e4244439aec4384208a36df73288c7c2ca2dcbee3a1d170be94f6c5c10a"
+  },
+  "nodeGroups": [],
+  "id": "rPKfO0JiEx14W5uz",
+  "tags": []
+}
