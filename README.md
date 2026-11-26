@@ -1,52 +1,67 @@
-# Kostal Project: Integration & Documentation
+# Kostal Solar Data Pipeline
 
-This documentation describes the step-by-step approach, architecture, and implementation of the Kostal project.cyxcyc
+> **Automatisierte End-to-End-Datenpipeline zum Auslesen, Speichern und Analysieren von Photovoltaik- und Energieflussdaten eines Kostal-Wechselrichters mit n8n, PostgreSQL und Power BI.**
 
-## 📋 Overview & Objectives
-The goal of this project was to connect, collect data from, and structurally analyze Kostal inverter and energy management data in order to monitor energy flows and performance metrics transparently dfgdfg
+```mermaid
+flowchart LR
+    A[Kostal Wechselrichter<br/>Lokale REST API] -->|Zyklisches Polling| B[n8n Workflow<br/>Docker-Container]
+    B -->|Datenbereinigung &<br/>Schema-Mapping| C[(PostgreSQL<br/>Zeitreihen-Datenbank)]
+    C -->|Direkte Anbindung| D[Power BI Dashboard<br/>Autarkie, Ertrag & Verbrauch]
+    E[Postman Collection<br/>API-Test & Doku] -.->|Validierte Endpunkte| B
+```
 
----
+*Datenfluss vom lokalen Kostal-Wechselrichter über die automatisierte n8n-Pipeline in PostgreSQL bis zur Auswertung in Power BI.*
 
-## 🚀 Step-by-Step Documentation
+## 1. Idee & Ausgangslage
 
-### 1. Requirements Analysis & Interface Clarification
-* **Data Source Identification:** Determining available endpoints, protocols, and data structures (e.g., Modbus TCP, REST API, or the Kostal device's local web server).
-* **Target Metrics Definition:** Establishing which values (current PV generation, household consumption, feed-in, battery state of charge, etc.) need to be polled regularly.
+* **Problem / Ziel:** Standard-Herstellerportale liefern oft nur aggregierte Übersichtswerte und erlauben keine flexiblen eigenen Langzeitanalysen zu Ertrag, Eigenverbrauch, Autarkiegrad oder Einspeisevergütung. Ziel war eine eigene, lokale Datenpipeline, die Messwerte strukturiert erfasst und für detaillierte Auswertungen dauerhaft speichert.
+* **Warum dieses Projekt?** Das Projekt verbindet klassische Schnittstellenanalyse und Datenmodellierung mit selbstgehosteter Automatisierung (Docker, n8n, PostgreSQL) und Business Intelligence – ein durchgängiger Praxis-Case von der Rohdaten-API bis zum fertigen Dashboard.
 
-### 2. API Exploration & Testing with Postman
-* **Request Setup:** Creating a Postman collection for targeted interaction with the Kostal inverter's REST endpoints.
-* **Validation & Auth:** Testing authentication mechanisms (if applicable) and checking JSON payloads and response times.
-* **Mocking & Documentation:** Documenting response structures for subsequent implementation in the automation pipeline.
+## 2. Lösung im Überblick
 
-![Postman Logo](./assets/postman.png)
+Eine lokal betriebene ETL-Pipeline pollt regelmäßig die aktuellen Leistungs- und Verbrauchswerte über die REST-API des Kostal-Wechselrichters, bereinigt die JSON-Antworten und schreibt sie in ein relationales Zeitreihen-Schema in **PostgreSQL**. Darauf aufbauend visualisiert **Power BI** die wichtigsten Energie-KPIs im Zeitverlauf.
 
-### 3. Architecture Design & Data Pipeline
-* **Automation Layer:** Setting up workflows (e.g., using n8n) utilizing the endpoints validated in Postman for automated polling at defined intervals.
-* **Database Design:** Setting up a structured relational database (PostgreSQL) for persistent storage of historical measurements and time series.
-* **Interface Design:** Defining fault tolerances, retry mechanisms for connection drops, and logging.
+```text
+Koastal-Solar-Data-Pipeline/
+├── README.md                  # Projektdokumentation & Architektur-Überblick
+├── assets/                    # Workflow-Screenshots & Power BI Dashboard-Ansichten
+├── postman/                   # Exportierte Postman-Collection & Umgebungsvorlage
+├── workflows/                 # Exportierter n8n-Workflow (.json)
+└── sql/                       # Tabellendefinitionen & Analyse-Abfragen
+```
 
-![n8n Workflow](./assets/n8n.png)
+## 3. Projektschritte (End-to-End-Umsetzung)
 
-### 4. Implementation & Automation
-* **API/Protocol Integration:** Building HTTP/Modbus queries within the automation environment and validating raw responses.
-* **Data Cleaning & Transformation:** Mapping raw data to a clean schema (timestamp, metric, unit, status).
-* **Automated Storage:** Writing the transformed datasets into the PostgreSQL database.
+1. **Anforderungsanalyse & Schnittstellenklärung:** Identifikation verfügbarer lokaler Schnittstellen und Datenstrukturen (REST API / Modbus TCP) sowie Festlegung der relevanten Kennzahlen (aktuelle PV-Erzeugung, Hausverbrauch, Netzeinspeisung, Netzbezug, Batterieladestand).
+2. **API-Erkundung & Tests mit Postman:** Aufbau einer Postman-Collection zur gezielten Abfrage der Kostal-REST-Endpunkte, Prüfung der Authentifizierung und Antwortzeiten sowie Dokumentation der JSON-Payloads als Grundlage für die Automatisierung.
+3. **Architektur- & Datenbankdesign:** Konzeption der Polling-Intervalle und Fehlertoleranzen (Retries und Logging bei Verbindungsabbrüchen) in **n8n** sowie Aufbau eines relationalen Schemas in **PostgreSQL** zur dauerhaften Speicherung historischer Messreihen.
+4. **Implementierung & Automatisierung:** Umsetzung der HTTP-Abfragen in **n8n (Docker)**, Bereinigung und Transformation der Rohdaten in ein einheitliches Zielschema (`timestamp`, `metric`, `unit`, `status`) und automatisiertes Schreiben in PostgreSQL.
+5. **Visualisierung & Monitoring:** Anbindung der PostgreSQL-Datenbank an **Power BI** zur Auswertung zentraler Kennzahlen wie Autarkiegrad, täglicher Solarertrag, Netzbezug und Eigenverbrauchsquote im Zeitverlauf.
 
-![PostgreSQL Logo](./assets/Postgres.png)
+![API-Erkundung & Tests mit Postman](assets/postman.png)
 
-### 5. Visualization & Monitoring
-* **BI Tool Integration:** Connecting the database to Power BI to create dashboards.
-* **Dashboard Design:** Visualizing key performance indicators such as self-sufficiency rate, daily solar yield, grid import, and self-consumption over time.
+![Konzeption der Polling-Intervalle in n8n](assets/n8n.png)
 
-![PowerBI Logo](./assets/PowerBI.png)
+![Aufbau eines relationalen Schemas in PostgreSQL](assets/Postgres.png)
 
----
+![Auswertung von Kennzahlen in Power BI](assets/PowerBI.png)
 
-## 🛠️ Tech Stack
-* **API Testing & Documentation:** Postman
-* **Automation:** n8n (Docker-based)
-* **Database:** PostgreSQL
-* **Visualization:** Power BI
-* **Protocols / Interfaces:** REST API / Modbus TCP
+## 4. Verwendete Tools & Technik
 
+* **Postman:** API-Exploration, Authentifizierungstests und Dokumentation der Endpunkte.
+* **n8n (Docker):** Zeitgesteuerte Orchestrierung der API-Abfragen, Datentransformation und Fehlerbehandlung.
+* **PostgreSQL:** Relationale Datenbank für die strukturierte Speicherung der Energie-Zeitreihen.
+* **Power BI:** Datenmodellierung und interaktives Dashboarding der Energieflüsse.
+* **Schnittstellen / Protokolle:** Lokale REST API (sowie Modbus TCP als Protokollgrundlage).
 
+## 5. Ergebnisse & Erkenntnisse
+
+* **Durchgängige Datenhoheit:** Alle relevanten PV- und Verbrauchsdaten liegen unabhängig von externen Cloud-Portalen strukturiert in einer eigenen SQL-Datenbank vor.
+* **Saubere Trennung von Exploration und Betrieb:** Die vorherige Validierung und Dokumentation der Payloads in Postman hat die Umsetzung und Fehlersuche im n8n-Workflow deutlich beschleunigt.
+* **Belastbare Datenbasis für Analysen:** Durch ein einheitliches Zeitreihen-Schema und eingebaute Retry-Logik lassen sich Tages-, Monats- und Jahresvergleiche (z. B. Einspeisevergütung vs. Eigenverbrauchsersparnis) zuverlässig in Power BI abbilden.
+
+## 6. Nächste Schritte / Roadmap
+
+* **Wetterdaten-Korrelation:** Verknüpfung der Ertrags- und Verbrauchsdaten mit historischen Wetterdaten (z. B. DWD-Stationsdaten), um saisonale Einflüsse und Wärmepumpen-Lasten auszuwerten.
+* **Automatisierte Anomalie-Benachrichtigung:** Alerting via n8n bei ungewöhnlich niedrigen Erträgen oder längeren API-Ausfällen.
+* **Erweiterung der Finanz-KPIs:** Dynamische Berechnung von Ersparnis und Einspeisevergütung bei wechselnden Stromtarifen direkt im SQL-Datenmodell.
